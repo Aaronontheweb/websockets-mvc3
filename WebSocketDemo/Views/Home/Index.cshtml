@@ -1,0 +1,100 @@
+﻿@{
+    ViewBag.Title = "WebSockets Console";
+    var hostStr = string.Format("{0}:{1}", Request.Url.Host, ViewBag.WebSocketPort);
+}
+@section AdditionalScripts{
+    <script language="javascript" type="text/javascript">
+        var noSupportMessage = "Your browser cannot support WebSocket! :(";
+        var ws = null;
+
+        $(function () {
+            ws = new WebSocket("ws://@hostStr");
+
+            //Bind all of the major events to function handlers
+            bindSocketEvents();
+
+            //send chatmessage
+            $("#btnexecute").click(function () {
+                if ($('#command').val().length == 0)
+                    return;
+
+                SendMessage($('#command').val());
+
+                $('#command').val('').focus();
+            });
+        });
+
+        function bindSocketEvents() {
+            ws.onmessage = function (msg) {
+                var response = JSON.parse(msg.data);
+                for (line in response.Messages) {
+                    if(line == 0) { //For the first line only
+                        writeConsole("server", response.Messages[line], true);
+                    }
+                    else { //Don't print the user data for any of the others
+                        writeConsole("server", response.Messages[line], false);
+                    }
+                }
+            };
+
+            ws.onclose = function (msg) {
+                writeConsole("terminal", "No WebSocket Connection :(", true);
+                $('#btnexecute').attr("disabled", "disabled");
+            };
+
+            ws.onopen = function (msg) {
+                writeConsole("terminal", "You are now WebSocket Connected :)", true);
+                $('#btnexecute').removeAttr("disabled");
+            };
+        }
+
+
+        function writeConsole(user, data, printUser) {
+            if(printUser) {
+                $('#console').append("<p class=" + user + ">&gt; " + user + "[" + GetTime() + "]: " + data + "</p>");
+            }
+            else {
+                $('#console').append("<p class=" + user + ">&gt; " + data + "</p>");
+            }
+            $('#console').animate({ scrollTop: $('#console')[0].scrollHeight });
+        }
+
+        function GetTime() {
+            var today = new Date();
+            var h = today.getHours();
+            var m = today.getMinutes();
+            var s = today.getSeconds();
+            m = checkTime(m);
+            s = checkTime(s);
+            var now = h + ":" + m + ":" + s;
+            return now;
+        }
+
+        function checkTime(i) {
+            if (i < 10) {
+                i = "0" + i;
+            }
+            return i;
+        }
+
+        function SendMessage(text) {
+            var json =
+                    {
+                        CommandText: text,
+                        When: GetTime()
+                    };
+
+            writeConsole("user", json.CommandText, true);
+            ws.send(JSON.stringify(json));
+        }
+    </script>
+}
+<h2>
+    Console</h2>
+<div id="console">
+</div>
+<div id="inputarea">
+    <input type="text" name="command" id="command" />
+    <button id="btnexecute" disabled="disabled">
+        Execute</button>
+</div>
