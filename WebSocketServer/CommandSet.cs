@@ -33,11 +33,14 @@ namespace TerminalSocketServer
             var commandOptions = ExtractCommandOptions(commands);
 
             var foundMatch = false;
-            foreach (var arg in this.Where(arg => arg.IsMatch(testArg)))
+            foreach (var arg in this)
             {
-                foundMatch = true;
-                arg.Invoke(commandOptions);
-                break; //Exit the for-loop
+                if(arg.IsMatch(testArg))
+                {
+                    foundMatch = true;
+                    arg.Invoke(commandOptions);
+                    break; //Exit the for-loop
+                }
             }
 
             //If we have not found a match, throw an exception
@@ -78,16 +81,22 @@ namespace TerminalSocketServer
     {
         private readonly Regex _r;
 
-        public CommandArgument(string commandSignature, string description, Action<string[]> executor)
+        public CommandArgument(string commandSignature, string description, Action<string[]> executor):
+            this(commandSignature, description, executor, new CommandSet())
         {
-            _r = new Regex(commandSignature, RegexOptions.IgnoreCase | RegexOptions.IgnorePatternWhitespace);
+        }
+
+        public CommandArgument(string commandSignature, string description, Action<string[]> executor, CommandSet subArguments)
+        {
+            _r = new Regex(commandSignature, RegexOptions.IgnoreCase);
             CommandRegex = commandSignature;
             Description = description;
             Executor = executor;
+            SubSet = subArguments;
         }
 
         public CommandArgument(string commandSignature, Action<string[]> executor)
-            :this(commandSignature, string.Empty, executor)
+            :this(commandSignature, string.Empty, executor, new CommandSet())
         {
             
         }
