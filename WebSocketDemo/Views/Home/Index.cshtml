@@ -54,7 +54,7 @@
                 $('#console').append("<p class=" + user + ">&gt; " + user + "[" + GetTime() + "]: " + data + "</p>");
             }
             else {
-                $('#console').append("<p class=" + user + ">&gt; " + data + "</p>");
+                $('#console').append("<p class=" + user + ">&nbsp;&nbsp;" + data + "</p>");
             }
             $('#console').animate({ scrollTop: $('#console')[0].scrollHeight });
         }
