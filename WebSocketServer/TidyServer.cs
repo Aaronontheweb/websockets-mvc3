@@ -4,49 +4,38 @@ using System.Configuration;
 using System.Linq;
 using System.Text;
 using System.Threading;
-using System.Web.Mvc;
-using System.Web.Routing;
 using Newtonsoft.Json;
 using SuperSocket.Common;
 using SuperSocket.SocketBase;
-using SuperSocket.SocketBase.Config;
 using SuperSocket.SocketEngine;
 using SuperSocket.SocketEngine.Configuration;
 using SuperWebSocket;
 
 namespace TerminalSocketServer
 {
-    public class WebSocketInitializer : System.Web.HttpApplication
+    public class TidyServer
     {
-
-
         private List<WebSocketSession> m_Sessions = new List<WebSocketSession>();
         private List<WebSocketSession> m_SecureSessions = new List<WebSocketSession>();
         private object m_SessionSyncRoot = new object();
         private object m_SecureSessionSyncRoot = new object();
         private Timer m_SecureSocketPushTimer;
 
-        void Application_Start(object sender, EventArgs e)
+        public int SecureSocketServerPort { get; set; }
+        public int SocketServerPort { get; set; }
+
+        public TidyServer()
         {
-            //Do our MVC magic first...
-            AreaRegistration.RegisterAllAreas();
-
-            RegisterGlobalFilters(GlobalFilters.Filters);
-            RegisterRoutes(RouteTable.Routes);
-
-            LogUtil.Setup();
-            StartSuperWebSocketByConfig();
-            var ts = new TimeSpan(0, 0, 5);
-            m_SecureSocketPushTimer = new Timer(OnSecureSocketPushTimerCallback, new object(), ts, ts);
-
+            
         }
 
-        void OnSecureSocketPushTimerCallback(object state)
+        public void Init()
         {
-            lock (m_SecureSessionSyncRoot)
-            {
-                m_SecureSessions.ForEach(s => s.SendResponseAsync("Push data from SecureWebSocket. Current Time: " + DateTime.Now));
-            }
+            LogUtil.Setup();
+            StartSuperWebSocketByConfig();
+
+            var ts = new TimeSpan(0, 0, 5);
+            m_SecureSocketPushTimer = new Timer(OnSecureSocketPushTimerCallback, new object(), ts, ts);
         }
 
         void StartSuperWebSocketByConfig()
@@ -58,8 +47,8 @@ namespace TerminalSocketServer
             var socketServer = SocketServerManager.GetServerByName("SuperWebSocket") as WebSocketServer;
             var secureSocketServer = SocketServerManager.GetServerByName("SecureSuperWebSocket") as WebSocketServer;
 
-            Application["WebSocketPort"] = socketServer.Config.Port;
-            Application["SecureWebSocketPort"] = secureSocketServer.Config.Port;
+            SocketServerPort = socketServer.Config.Port;
+            SecureSocketServerPort = secureSocketServer.Config.Port;
 
             socketServer.NewMessageReceived += new SessionEventHandler<WebSocketSession, string>(socketServer_NewMessageReceived);
             socketServer.NewSessionConnected += new SessionEventHandler<WebSocketSession>(socketServer_NewSessionConnected);
@@ -72,23 +61,31 @@ namespace TerminalSocketServer
                 SocketServerManager.Stop();
         }
 
+        void OnSecureSocketPushTimerCallback(object state)
+        {
+            lock (m_SecureSessionSyncRoot)
+            {
+                m_SecureSessions.ForEach(s => s.SendResponseAsync("Push data from SecureWebSocket. Current Time: " + DateTime.Now));
+            }
+        }
+
         void socketServer_NewMessageReceived(WebSocketSession session, string e)
         {
             var command = JsonConvert.DeserializeObject<ConsoleCommand>(e);
-            
+
             try
             {
                 IConsoleResponder r = new ConsoleResponder(SendToAll);
                 r.ProcessResponse(command, session);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 var response = new ConsoleCommandResponse();
                 response.AppendMessage("Server Error! :(");
                 response.AppendMessage(ex.Message);
                 session.SendResponseAsync(response.Serialize());
             }
-            
+
         }
 
         void secureSocketServer_SessionClosed(WebSocketSession session, CloseReason reason)
@@ -107,7 +104,7 @@ namespace TerminalSocketServer
             }
         }
 
-     
+
         void socketServer_NewSessionConnected(WebSocketSession session)
         {
             lock (m_SessionSyncRoot)
@@ -123,7 +120,7 @@ namespace TerminalSocketServer
                 return;
         }
 
-        void SendToAll(string message)
+        public void SendToAll(string message)
         {
             lock (m_SessionSyncRoot)
             {
@@ -135,51 +132,11 @@ namespace TerminalSocketServer
             }
         }
 
-        void Application_End(object sender, EventArgs e)
+        public void Kill()
         {
             m_SecureSocketPushTimer.Change(Timeout.Infinite, Timeout.Infinite);
             m_SecureSocketPushTimer.Dispose();
             SocketServerManager.Stop();
         }
-
-        void Application_Error(object sender, EventArgs e)
-        {
-            // Code that runs when an unhandled error occurs
-
-        }
-
-        void Session_Start(object sender, EventArgs e)
-        {
-            // Code that runs when a new session is started
-
-        }
-
-        void Session_End(object sender, EventArgs e)
-        {
-            // Code that runs when a session ends. 
-            // Note: The Session_End event is raised only when the sessionstate mode
-            // is set to InProc in the Web.config file. If session mode is set to StateServer 
-            // or SQLServer, the event is not raised.
-
-        }
-
-        #region routing functions
-        public static void RegisterGlobalFilters(GlobalFilterCollection filters)
-        {
-            filters.Add(new HandleErrorAttribute());
-        }
-
-        public static void RegisterRoutes(RouteCollection routes)
-        {
-            routes.IgnoreRoute("{resource}.axd/{*pathInfo}");
-
-            routes.MapRoute(
-                "Default", // Route name
-                "{controller}/{action}/{id}", // URL with parameters
-                new { controller = "Home", action = "Index", id = UrlParameter.Optional } // Parameter defaults
-            );
-
-        }
-        #endregion
     }
 }
