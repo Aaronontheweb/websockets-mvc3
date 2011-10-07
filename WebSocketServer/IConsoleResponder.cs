@@ -19,16 +19,20 @@ namespace TerminalSocketServer
         private ConsoleCommandResponse _response;
         public readonly CommandSet _commands;
         private WebSocketSession _session;
+        private Action<string> _sendAllMethod;
 
-        public ConsoleResponder()
+        public ConsoleResponder() : this(null){}
+
+        public ConsoleResponder(Action<string> sendAllMethod)
         {
+            _sendAllMethod = sendAllMethod;
             _commands = new CommandSet()
                               {
                                   new CommandArgument("echo|-e|--echo","Echoes a simple response back from the server. Sample usage:\n\t\t\t" +
                                                                        "$echo \"Hi!\"\n\t\t\t" +
                                                                        "Server: \"Hi!\"", v => _response = Echo(v.FirstOrDefault())),
                                   new CommandArgument("help|-h|--help","{help} explains all of the available commands. " +
-                                                                       "Can be used at the end of each individual command (--help) for command-specific instructions.", v =>  _response = Help()),
+                                                                       "Can be used at the end of each individual command (--help) for command-specific instructions.", v =>  _session.SendResponseAsync(Help().Serialize())),
                                   new CommandArgument("net|--net","{net} performs some network communication and status operations.", v => {}, //No-op for good ole' net
                                       new CommandSet()
                                           {
@@ -62,7 +66,6 @@ namespace TerminalSocketServer
                 response.AppendMessage(PrettyFormat(o));
             }
 
-            _session.SendResponseAsync(response.Serialize());
             return response;
         }
 
@@ -83,13 +86,30 @@ namespace TerminalSocketServer
             return response;
         }
 
+        public ConsoleCommandResponse IpConfig()
+        {
+            var response = new ConsoleCommandResponse();
+
+
+            return response;
+        }
+
         public ConsoleCommandResponse NetSend(string target, string content)
         {
             var response = new ConsoleCommandResponse();
             response.AppendMessage(string.Format("Message from [{0}]", _session.SessionID));
             response.AppendMessage(content);
 
-            _session.SendResponseAsync(content);
+            if (_sendAllMethod == null)
+            {
+                //Send the result back to just the current user
+                _session.SendResponseAsync(response.Serialize()); 
+                
+            }
+            else
+            {
+                _sendAllMethod.Invoke(response.Serialize());
+            }
 
             return response;
         }

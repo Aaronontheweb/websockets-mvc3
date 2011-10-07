@@ -78,7 +78,7 @@ namespace TerminalSocketServer
             
             try
             {
-                IConsoleResponder r = new ConsoleResponder();
+                IConsoleResponder r = new ConsoleResponder(SendToAll);
                 r.ProcessResponse(command, session);
             }
             catch(Exception ex)
