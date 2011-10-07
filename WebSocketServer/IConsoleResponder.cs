@@ -29,6 +29,11 @@ namespace TerminalSocketServer
                                                                        "Server: \"Hi!\"", v => _response = Echo(v.FirstOrDefault())),
                                   new CommandArgument("help|-h|--help","{help} explains all of the available commands. " +
                                                                        "Can be used at the end of each individual command (--help) for command-specific instructions.", v =>  _response = Help()),
+                                  new CommandArgument("net|--net","{net} performs some network communication and status operations.", v => {}, //No-op for good ole' net
+                                      new CommandSet()
+                                          {
+                                              new CommandArgument("send", "{net send} sends a message to another client on the network", v => NetSend(v[0],v[1]))
+                                          })
                               };
         }
 
@@ -75,6 +80,17 @@ namespace TerminalSocketServer
             var response = new ConsoleCommandResponse();
             response.AppendMessage(content);
             _session.SendResponseAsync(response.Serialize());
+            return response;
+        }
+
+        public ConsoleCommandResponse NetSend(string target, string content)
+        {
+            var response = new ConsoleCommandResponse();
+            response.AppendMessage(string.Format("Message from [{0}]", _session.SessionID));
+            response.AppendMessage(content);
+
+            _session.SendResponseAsync(content);
+
             return response;
         }
     }

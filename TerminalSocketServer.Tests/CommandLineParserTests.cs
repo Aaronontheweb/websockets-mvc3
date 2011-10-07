@@ -73,5 +73,32 @@ namespace TerminalSocketServer.Tests
             options.Parse("--help");
             Assert.IsFalse(setFinished); //Should have been set to "false" when the options found it ;)
         }
+
+        [Test(Description = "Can we do nested commands which take multiple arguments?")]
+        public void Can_Execute_Nested_Commands()
+        {
+            var foundNet = false;
+            var foundSend = false;
+            var foundSendArguments = false;
+
+            var options = new CommandSet()
+                              {
+                                  new CommandArgument("net|--net","{net} performs some network communication and status operations.", v => foundNet = true,
+                                      new CommandSet()
+                                          {
+                                              new CommandArgument("send", "{net send} sends a message to another client on the network", v =>
+                                                                                                                                 {
+                                                                                                                                     foundSend = true;
+                                                                                                                                     if (v[0] != null && v[1] != null)
+                                                                                                                                         foundSendArguments = true;
+                                                                                                                                 })
+                                          })};
+
+            var commandLine = "net send * \"Hello everyone!\"";
+            options.Parse(commandLine);
+            Assert.IsTrue(foundNet);
+            Assert.IsTrue(foundSend);
+            Assert.IsTrue(foundSendArguments);
+        }
     }
 }

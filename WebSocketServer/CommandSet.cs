@@ -10,7 +10,7 @@ namespace TerminalSocketServer
 {
     public class CommandSet : List<CommandArgument>
     {
-        public CommandSet() {}
+        public CommandSet() { }
 
         public CommandSet(IEnumerable<CommandArgument> arguments)
             : base(arguments)
@@ -23,11 +23,17 @@ namespace TerminalSocketServer
             Parse(commandArray);
         }
 
-        public void Parse(IList<string> commands)
+        public void Parse(IList<string> commands, bool isSubset = false)
         {
             //Raise an exception if there are no commands to test...
             if (commands.Count == 0)
+            {
+                if(isSubset) //Bail if it's a subset...
+                {
+                    return;
+                }
                 throw new MissingCommandArgumentException("There were no command arguments sent to the parser (you didn't supply any.)");
+            }
 
             var testArg = commands[0];
             var commandOptions = ExtractCommandOptions(commands);
@@ -35,16 +41,18 @@ namespace TerminalSocketServer
             var foundMatch = false;
             foreach (var arg in this)
             {
-                if(arg.IsMatch(testArg))
+                if (arg.IsMatch(testArg))
                 {
                     foundMatch = true;
                     arg.Invoke(commandOptions);
+                    if(arg.SubSet.Count > 0) //If this argument takes sub-arguments...
+                        arg.SubSet.Parse(commandOptions, true); //Parse down the rest of the tree
                     break; //Exit the for-loop
                 }
             }
 
             //If we have not found a match, throw an exception
-            if(!foundMatch)
+            if (!foundMatch)
             {
                 throw new MissingCommandArgumentException(string.Format("No matching commands were found for {0}", testArg));
             }
@@ -65,14 +73,14 @@ namespace TerminalSocketServer
 
     public class MissingCommandArgumentException : Exception
     {
-        public MissingCommandArgumentException(string message) : base(message){}
+        public MissingCommandArgumentException(string message) : base(message) { }
         public MissingCommandArgumentException(string message, Exception innerException) : base(message, innerException) { }
         public MissingCommandArgumentException(SerializationInfo info, StreamingContext context) : base(info, context) { }
     }
 
     public class CommandArgumentException : Exception
     {
-        public CommandArgumentException(string message) : base(message){}
+        public CommandArgumentException(string message) : base(message) { }
         public CommandArgumentException(string message, Exception innerException) : base(message, innerException) { }
         public CommandArgumentException(SerializationInfo info, StreamingContext context) : base(info, context) { }
     }
@@ -81,7 +89,7 @@ namespace TerminalSocketServer
     {
         private readonly Regex _r;
 
-        public CommandArgument(string commandSignature, string description, Action<string[]> executor):
+        public CommandArgument(string commandSignature, string description, Action<string[]> executor) :
             this(commandSignature, description, executor, new CommandSet())
         {
         }
@@ -96,15 +104,15 @@ namespace TerminalSocketServer
         }
 
         public CommandArgument(string commandSignature, Action<string[]> executor)
-            :this(commandSignature, string.Empty, executor, new CommandSet())
+            : this(commandSignature, string.Empty, executor, new CommandSet())
         {
-            
+
         }
 
         /// <summary>
         /// Each command can have nested commands, as it should be
         /// </summary>
-        public CommandSet SubSet { get; set; } 
+        public CommandSet SubSet { get; set; }
 
         /// <summary>
         /// Regular expression used to match the argument, aka "echo|--echo|e"
@@ -116,7 +124,7 @@ namespace TerminalSocketServer
         /// </summary>
         public string Description { get; set; }
 
-        private Action<string[]> Executor { get; set; } 
+        private Action<string[]> Executor { get; set; }
 
         public void Invoke(string[] args)
         {
